@@ -18,8 +18,7 @@ export async function POST(request: Request) {
         const mercariResult = await fetchMercariListing(url)
         if ('error' in mercariResult) {
           controller.enqueue(send({ type: 'error', message: mercariResult.error, step: 'mercari' }))
-          controller.close()
-          return
+          return  // finally block closes the stream
         }
         controller.enqueue(send({ type: 'mercari', data: mercariResult }))
 
