@@ -32,36 +32,41 @@ export default function Home() {
         body: JSON.stringify({ url }),
       })
 
+      if (!res.ok) throw new Error(`Request failed: ${res.status}`)
       if (!res.body) throw new Error('No response body')
 
       const reader = res.body.getReader()
       const decoder = new TextDecoder()
       let buffer = ''
 
+      function processLine(line: string) {
+        if (!line.trim()) return
+        const chunk = JSON.parse(line) as AnalyzeChunk
+        if (chunk.type === 'mercari') {
+          setMercari(chunk.data)
+        } else if (chunk.type === 'meta') {
+          setTitleEn(chunk.data.title_en)
+          setUsdRate(chunk.data.usd_rate)
+        } else if (chunk.type === 'ebay') {
+          setListings(chunk.data.listings)
+          setStatus('done')
+        } else if (chunk.type === 'error') {
+          setError(chunk.message)
+          setStatus('error')
+        }
+      }
+
       while (true) {
         const { done, value } = await reader.read()
-        if (done) break
+        if (done) {
+          buffer += decoder.decode() // flush TextDecoder internal state
+          if (buffer.trim()) processLine(buffer)
+          break
+        }
         buffer += decoder.decode(value, { stream: true })
         const lines = buffer.split('\n')
         buffer = lines.pop() ?? ''
-
-        for (const line of lines) {
-          if (!line.trim()) continue
-          const chunk = JSON.parse(line) as AnalyzeChunk
-
-          if (chunk.type === 'mercari') {
-            setMercari(chunk.data)
-          } else if (chunk.type === 'meta') {
-            setTitleEn(chunk.data.title_en)
-            setUsdRate(chunk.data.usd_rate)
-          } else if (chunk.type === 'ebay') {
-            setListings(chunk.data.listings)
-            setStatus('done')
-          } else if (chunk.type === 'error') {
-            setError(chunk.message)
-            setStatus('error')
-          }
-        }
+        for (const line of lines) processLine(line)
       }
     } catch (err) {
       setError('Something went wrong. Please try again.')
@@ -84,7 +89,8 @@ export default function Home() {
       setListings(data.listings)
       setStatus('done')
     } catch {
-      setStatus('done') // don't wipe existing results on re-search failure
+      setListings([])
+      setStatus('done')
     }
   }
 
@@ -112,10 +118,7 @@ export default function Home() {
               titleEn={titleEn}
               usdRate={usdRate}
               loading={loading}
-              onEditTitle={(next) => {
-                setTitleEn(next)
-                handleReSearch(next)
-              }}
+              onEditTitle={handleReSearch}
             />
             <EbayPanel
               listings={listings}
