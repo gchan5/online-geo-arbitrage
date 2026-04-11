@@ -35,6 +35,9 @@ export function ArbitrageBar({ mercariPriceJpy, usdRate, listings }: ArbitrageBa
     }
   }
 
+  const bestProfit = calculateFees({ mercariPriceJpy, usdRate, ...feeInputs }, [fees.highSalePrice]).profitFreeShip
+  const worstProfit = calculateFees({ mercariPriceJpy, usdRate, ...feeInputs }, [fees.lowSalePrice]).profitFreeShip
+
   const profitColor = (n: number) =>
     n > 0 ? 'text-green-400' : n < 0 ? 'text-red-400' : 'text-zinc-400'
 
@@ -64,13 +67,13 @@ export function ArbitrageBar({ mercariPriceJpy, usdRate, listings }: ArbitrageBa
         </div>
 
         <div className="flex gap-5">
-          <Stat label="Best Case" value={fmt(calculateFees({ mercariPriceJpy, usdRate, ...feeInputs }, [fees.highSalePrice]).profitFreeShip)} positive={calculateFees({ mercariPriceJpy, usdRate, ...feeInputs }, [fees.highSalePrice]).profitFreeShip > 0} />
-          <Stat label="Avg" value={fmt(fees.profitFreeShip)} positive={fees.profitFreeShip > 0} />
+          <Stat label="Best Case" value={fmt(bestProfit)} profit={bestProfit} />
+          <Stat label="Avg" value={fmt(fees.profitFreeShip)} profit={fees.profitFreeShip} />
           <div className="text-center">
             <p className="text-xs text-emerald-300 uppercase tracking-widest mb-1">Break-Even</p>
             <p className="text-sm font-semibold text-amber-400">${fees.breakEvenFreeShip.toFixed(2)}</p>
           </div>
-          <Stat label="Worst Case" value={fmt(calculateFees({ mercariPriceJpy, usdRate, ...feeInputs }, [fees.lowSalePrice]).profitFreeShip)} positive={calculateFees({ mercariPriceJpy, usdRate, ...feeInputs }, [fees.lowSalePrice]).profitFreeShip > 0} />
+          <Stat label="Worst Case" value={fmt(worstProfit)} profit={worstProfit} />
         </div>
       </div>
 
@@ -147,11 +150,12 @@ export function ArbitrageBar({ mercariPriceJpy, usdRate, listings }: ArbitrageBa
   )
 }
 
-function Stat({ label, value, positive }: { label: string; value: string; positive: boolean }) {
+function Stat({ label, value, profit }: { label: string; value: string; profit: number }) {
+  const color = profit > 0 ? 'text-green-400' : profit < 0 ? 'text-red-400' : 'text-zinc-400'
   return (
     <div className="text-center">
       <p className="text-xs text-emerald-300 uppercase tracking-widest mb-1">{label}</p>
-      <p className={`text-sm font-semibold ${positive ? 'text-green-400' : 'text-red-400'}`}>{value}</p>
+      <p className={`text-sm font-semibold ${color}`}>{value}</p>
     </div>
   )
 }
