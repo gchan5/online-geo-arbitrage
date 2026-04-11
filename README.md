@@ -1,36 +1,98 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Online Geo-Arbitrage
 
-## Getting Started
+A dark-mode web app for finding geographic arbitrage opportunities between Mercari Japan and eBay US — targeted at Pokemon TCG and other collectibles.
 
-First, run the development server:
+Paste a Mercari JP listing URL and instantly see matching eBay sold listings alongside a full profit estimate after all fees.
+
+## Features
+
+- **Mercari JP scraping** — pulls listing image, title, price, condition, and seller rating directly from the page
+- **Auto-translation** — translates the Japanese item name to English via Google Translate (editable before search)
+- **eBay sold listings** — searches eBay's Finding API for completed sales matching the translated title, with thumbnails and direct links
+- **Arbitrage dashboard** — calculates net profit after all fees:
+  - Buyee proxy service fee (¥300) + Japan domestic shipping (¥500)
+  - International shipping (editable, default $10)
+  - eBay final value fee (editable, default 13.25%)
+  - eBay per-order fee ($0.30)
+  - eBay domestic shipping (editable, default $4.50)
+- **Dual shipping scenarios** — shows profit for both "free shipping" and "buyer pays" simultaneously
+- **Best / Avg / Worst / Break-even** stats across all sold listings
+- **Re-search** — edit the translated title and re-query eBay without re-scraping Mercari
+
+## Tech Stack
+
+- [Next.js](https://nextjs.org/) (App Router) + TypeScript
+- Tailwind CSS (dark mode)
+- [eBay Finding API](https://developer.ebay.com/Devzone/finding/Concepts/FindingAPIGuide.html) — sold listings
+- [Google Cloud Translation API v2](https://cloud.google.com/translate/docs/reference/rest) — JP → EN
+- [Frankfurter](https://www.frankfurter.app/) — live JPY → USD exchange rate
+- [Buyee](https://buyee.jp/) fee model for Japan proxy purchasing
+- Deployed on [Vercel](https://vercel.com/)
+
+## Setup
+
+### 1. Clone and install
+
+```bash
+git clone https://github.com/gchan5/online-geo-arbitrage.git
+cd online-geo-arbitrage
+npm install
+```
+
+### 2. Environment variables
+
+Copy the example file and fill in your keys:
+
+```bash
+cp .env.local.example .env.local
+```
+
+```
+GOOGLE_TRANSLATE_API_KEY=   # Google Cloud Translation API key
+EBAY_APP_ID=                # eBay Developer App ID (Client ID)
+```
+
+**Getting API keys:**
+
+- **eBay App ID:** [developer.ebay.com](https://developer.ebay.com) → My Account → Application Keys → create a Production app → copy the App ID (Client ID)
+- **Google Translate key:** [console.cloud.google.com](https://console.cloud.google.com) → enable Cloud Translation API → Credentials → Create API Key
+
+### 3. Run locally
 
 ```bash
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Open [http://localhost:3000](http://localhost:3000), paste a Mercari JP listing URL (e.g. `https://jp.mercari.com/item/m12345678`), and click Compare.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Deploy to Vercel
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+1. Push to GitHub
+2. Import the repo at [vercel.com](https://vercel.com) → New Project
+3. Add `GOOGLE_TRANSLATE_API_KEY` and `EBAY_APP_ID` as environment variables
+4. Deploy — the `vercel.json` already sets a 30s timeout on the analyze route
 
-## Learn More
+## How It Works
 
-To learn more about Next.js, take a look at the following resources:
+```
+User pastes Mercari URL
+        ↓
+POST /api/analyze  (streaming NDJSON)
+        ↓ chunk 1
+  Scrape Mercari JP → title, price, images, condition
+        ↓ chunk 2
+  Google Translate → English title
+  Frankfurter      → JPY/USD rate
+        ↓ chunk 3
+  eBay Finding API → sold listings
+        ↓
+  Client computes arbitrage stats from sold prices + fees
+```
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## Running Tests
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+```bash
+npm test
+```
 
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+Unit tests cover fee calculation, Mercari scraping, eBay API client, translation, and exchange rate modules.
