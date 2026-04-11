@@ -13,6 +13,7 @@ export async function POST(request: Request) {
 
   const stream = new ReadableStream({
     async start(controller) {
+      let currentStep: 'mercari' | 'translate' | 'ebay' = 'mercari'
       try {
         // Step 1: Scrape Mercari JP
         const mercariResult = await fetchMercariListing(url)
@@ -23,6 +24,7 @@ export async function POST(request: Request) {
         controller.enqueue(send({ type: 'mercari', data: mercariResult }))
 
         // Step 2: Translate + exchange rate in parallel
+        currentStep = 'translate'
         const [translateResult, usdRate] = await Promise.all([
           translateToEnglish(mercariResult.title_jp),
           fetchExchangeRate(),
@@ -33,6 +35,7 @@ export async function POST(request: Request) {
         }))
 
         // Step 3: eBay sold listings
+        currentStep = 'ebay'
         const listings = await findSoldListings(translateResult.text)
         controller.enqueue(send({
           type: 'ebay',
@@ -43,7 +46,7 @@ export async function POST(request: Request) {
         controller.enqueue(send({
           type: 'error',
           message: 'An unexpected error occurred.',
-          step: 'mercari',
+          step: currentStep,
         }))
       } finally {
         controller.close()
