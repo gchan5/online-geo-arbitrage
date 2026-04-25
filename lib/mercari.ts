@@ -38,6 +38,43 @@ interface MercariItem {
   shippingPayer?: string
 }
 
+function getMetaContent($: cheerio.CheerioAPI, key: string): string {
+  return (
+    $(`meta[property="${key}"]`).attr('content') ??
+    $(`meta[name="${key}"]`).attr('content') ??
+    ''
+  ).trim()
+}
+
+function stripMercariTitleSuffix(title: string): string {
+  return title.replace(/\s*by メルカリ$/, '').trim()
+}
+
+function extractListingFromMeta(
+  $: cheerio.CheerioAPI,
+  url: string
+): MercariListing | null {
+  const rawTitle = getMetaContent($, 'og:title')
+  const rawPrice = getMetaContent($, 'product:price:amount')
+  const image = getMetaContent($, 'og:image')
+  const price = Number.parseInt(rawPrice, 10)
+
+  if (!rawTitle || Number.isNaN(price)) {
+    return null
+  }
+
+  return {
+    title_jp: stripMercariTitleSuffix(rawTitle),
+    images: image ? [image] : [],
+    price_jpy: price,
+    condition: '',
+    condition_en: '',
+    seller_rating: 'N/A',
+    shipping_included: false,
+    url,
+  }
+}
+
 function extractItem(data: unknown): MercariItem | null {
   // Try known __NEXT_DATA__ paths — defensive in case Mercari updates their structure
   const candidates = [
@@ -85,6 +122,10 @@ export async function fetchMercariListing(
   const $ = cheerio.load(html)
   const nextDataText = $('#__NEXT_DATA__').text()
   if (!nextDataText) {
+    const listingFromMeta = extractListingFromMeta($, url)
+    if (listingFromMeta) {
+      return listingFromMeta
+    }
     return { error: 'Could not parse listing data — Mercari JP page structure may have changed.', step: 'mercari' }
   }
 
@@ -97,6 +138,10 @@ export async function fetchMercariListing(
 
   const item = extractItem(nextData)
   if (!item) {
+    const listingFromMeta = extractListingFromMeta($, url)
+    if (listingFromMeta) {
+      return listingFromMeta
+    }
     return { error: 'Could not find item data in listing page.', step: 'mercari' }
   }
 
