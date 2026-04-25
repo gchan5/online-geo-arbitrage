@@ -18,6 +18,22 @@ function makeHtml(nextData: string) {
   </body></html>`
 }
 
+function makeMetaHtml({
+  title = 'ビジョット 073/pcg-p 未開封',
+  price = '5200',
+  image = 'https://static.mercdn.net/item/detail/orig/photos/m58789949313_1.jpg?1777130351',
+}: {
+  title?: string
+  price?: string
+  image?: string
+}) {
+  return `<html><head>
+    <meta property="og:title" content="${title} by メルカリ" />
+    <meta property="product:price:amount" content="${price}" />
+    <meta property="og:image" content="${image}" />
+  </head><body></body></html>`
+}
+
 describe('mapConditionToEnglish', () => {
   it('maps known JP condition strings to English', () => {
     expect(mapConditionToEnglish('新品、未使用')).toBe('New, unused')
@@ -81,6 +97,21 @@ describe('fetchMercariListing', () => {
     }))
     const result = await fetchMercariListing('https://jp.mercari.com/item/m123')
     expect('error' in result).toBe(true)
+  })
+
+  it('falls back to meta tags when __NEXT_DATA__ is missing', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
+      ok: true,
+      text: async () => makeMetaHtml({}),
+    }))
+
+    const result = await fetchMercariListing('https://jp.mercari.com/item/m58789949313')
+    expect('error' in result).toBe(false)
+    if (!('error' in result)) {
+      expect(result.title_jp).toBe('ビジョット 073/pcg-p 未開封')
+      expect(result.price_jpy).toBe(5200)
+      expect(result.images[0]).toContain('m58789949313_1.jpg')
+    }
   })
 
   it('returns error when response is not ok (e.g. 403)', async () => {
