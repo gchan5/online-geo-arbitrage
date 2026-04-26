@@ -5,6 +5,12 @@ export async function POST(request: Request) {
   if (!query?.trim()) {
     return Response.json({ error: 'query is required' }, { status: 400 })
   }
-  const listings = await findSoldListings(query.trim())
+  const normalizedQuery = query.trim()
+  console.info('[api/ebay-search] received query', { query: normalizedQuery })
+  const listings = await findSoldListings(normalizedQuery)
+  console.info('[api/ebay-search] completed search', {
+    query: normalizedQuery,
+    total_results: listings.length,
+  })
   return Response.json({ listings, total_results: listings.length })
 }

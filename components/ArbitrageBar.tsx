@@ -37,6 +37,8 @@ export function ArbitrageBar({ mercariPriceJpy, usdRate, listings }: ArbitrageBa
 
   const bestProfit = calculateFees({ mercariPriceJpy, usdRate, ...feeInputs }, [fees.highSalePrice]).profitFreeShip
   const worstProfit = calculateFees({ mercariPriceJpy, usdRate, ...feeInputs }, [fees.lowSalePrice]).profitFreeShip
+  const profitable = fees.profitFreeShip > 0
+  const shortfall = Math.max(0, fees.breakEvenFreeShip - fees.avgSalePrice)
 
   const profitColor = (n: number) =>
     n > 0 ? 'text-green-400' : n < 0 ? 'text-red-400' : 'text-zinc-400'
@@ -45,7 +47,7 @@ export function ArbitrageBar({ mercariPriceJpy, usdRate, listings }: ArbitrageBa
     `${n >= 0 ? '+' : ''}$${Math.abs(n).toFixed(2)}`
 
   return (
-    <div className="bg-emerald-950 border border-emerald-900 rounded-xl p-5">
+    <div className={`${profitable ? 'bg-emerald-950 border-emerald-900' : 'bg-red-950 border-red-900'} border rounded-xl p-5`}>
 
       {/* Headline */}
       <div className="flex flex-wrap justify-between items-start gap-4 mb-5">
@@ -55,13 +57,13 @@ export function ArbitrageBar({ mercariPriceJpy, usdRate, listings }: ArbitrageBa
           </p>
           <p className={`text-3xl font-extrabold leading-none ${profitColor(fees.profitFreeShip)}`}>
             {fmt(fees.profitFreeShip)}{' '}
-            <span className="text-lg text-emerald-400">
-              {fees.avgSalePrice > 0
-                ? `${((fees.profitFreeShip / fees.avgSalePrice) * 100).toFixed(0)}%`
+            <span className={`text-lg ${profitable ? 'text-emerald-400' : 'text-red-300'}`}>
+              {fees.totalCostFreeShip > 0
+                ? `${((fees.profitFreeShip / fees.totalCostFreeShip) * 100).toFixed(0)}% ROI`
                 : ''}
             </span>
           </p>
-          <p className="text-xs text-emerald-400 mt-1">
+          <p className={`text-xs mt-1 ${profitable ? 'text-emerald-400' : 'text-red-300'}`}>
             Based on eBay avg sold price of ${fees.avgSalePrice.toFixed(2)} · free shipping
           </p>
         </div>
@@ -77,26 +79,37 @@ export function ArbitrageBar({ mercariPriceJpy, usdRate, listings }: ArbitrageBa
         </div>
       </div>
 
+      {!profitable && (
+        <div className="mb-4 rounded-lg border border-red-800 bg-red-950/60 px-3 py-2">
+          <p className="text-sm font-semibold text-red-200">
+            Not profitable with current assumptions.
+          </p>
+          <p className="text-xs text-red-300 mt-1">
+            Need about ${shortfall.toFixed(2)} higher average sale price to break even on free shipping.
+          </p>
+        </div>
+      )}
+
       {/* Fee breakdown */}
-      <div className="flex flex-wrap gap-6 border-t border-emerald-900 pt-4">
+      <div className={`flex flex-wrap gap-6 border-t pt-4 ${profitable ? 'border-emerald-900' : 'border-red-900'}`}>
 
         {/* Costs */}
         <div className="flex-1 min-w-48">
-          <p className="text-xs text-emerald-300 uppercase tracking-widest mb-2">Total Cost</p>
+          <p className={`text-xs uppercase tracking-widest mb-2 ${profitable ? 'text-emerald-300' : 'text-red-300'}`}>Total Cost</p>
           <FeeRow label="Mercari price" value={`¥${mercariPriceJpy.toLocaleString()} ($${(mercariPriceJpy * usdRate).toFixed(2)})`} />
           <FeeRow label="Buyee service fee" value={`¥${feeInputs.buyeeServiceFeeJpy} ($${(feeInputs.buyeeServiceFeeJpy * usdRate).toFixed(2)})`} />
           <FeeRow label="Japan domestic ship" value={`¥${feeInputs.buyeeDomesticShipJpy} ($${(feeInputs.buyeeDomesticShipJpy * usdRate).toFixed(2)})`} />
           <EditableFeeRow label="Intl. shipping (est.)" prefix="$" value={feeInputs.intlShippingUsd} onChange={v => update('intlShippingUsd', v)} />
           <EditableFeeRow label="eBay domestic ship" prefix="$" value={feeInputs.ebayDomesticShipUsd} onChange={v => update('ebayDomesticShipUsd', v)} />
-          <div className="border-t border-emerald-900 mt-1.5 pt-1.5 flex justify-between">
-            <span className="text-xs font-bold text-emerald-300">Total cost</span>
+          <div className={`border-t mt-1.5 pt-1.5 flex justify-between ${profitable ? 'border-emerald-900' : 'border-red-900'}`}>
+            <span className={`text-xs font-bold ${profitable ? 'text-emerald-300' : 'text-red-300'}`}>Total cost</span>
             <span className="text-xs font-bold text-zinc-200">${fees.totalCostFreeShip.toFixed(2)}</span>
           </div>
         </div>
 
         {/* Revenue */}
         <div className="flex-1 min-w-48">
-          <p className="text-xs text-emerald-300 uppercase tracking-widest mb-2">Revenue After eBay Fees</p>
+          <p className={`text-xs uppercase tracking-widest mb-2 ${profitable ? 'text-emerald-300' : 'text-red-300'}`}>Revenue After eBay Fees</p>
           <FeeRow label="eBay avg sale price" value={`$${fees.avgSalePrice.toFixed(2)}`} />
           <div className="flex justify-between items-center mb-1">
             <span className="text-xs text-zinc-400">eBay final value fee</span>
@@ -115,16 +128,16 @@ export function ArbitrageBar({ mercariPriceJpy, usdRate, listings }: ArbitrageBa
           </div>
           <FeeRow label="eBay per-order fee" value={`$${feeInputs.ebayPerOrderFee.toFixed(2)}`} />
           <FeeRow label="eBay deduction" value={`−$${fees.ebayDeductionFreeShip.toFixed(2)}`} negative />
-          <div className="border-t border-emerald-900 mt-1.5 pt-1.5 flex justify-between">
-            <span className="text-xs font-bold text-emerald-300">Net revenue</span>
+          <div className={`border-t mt-1.5 pt-1.5 flex justify-between ${profitable ? 'border-emerald-900' : 'border-red-900'}`}>
+            <span className={`text-xs font-bold ${profitable ? 'text-emerald-300' : 'text-red-300'}`}>Net revenue</span>
             <span className="text-xs font-bold text-zinc-200">${fees.netRevenueFreeShip.toFixed(2)}</span>
           </div>
         </div>
       </div>
 
       {/* Shipping toggle */}
-      <div className="flex flex-wrap items-center gap-3 mt-4 border-t border-emerald-900 pt-4">
-        <span className="text-xs text-emerald-300 uppercase tracking-widest">eBay listing:</span>
+      <div className={`flex flex-wrap items-center gap-3 mt-4 border-t pt-4 ${profitable ? 'border-emerald-900' : 'border-red-900'}`}>
+        <span className={`text-xs uppercase tracking-widest ${profitable ? 'text-emerald-300' : 'text-red-300'}`}>eBay listing:</span>
         <span className="text-xs bg-emerald-900 border border-emerald-700 text-green-400 font-semibold rounded px-2.5 py-1">
           Free shipping
         </span>
@@ -133,17 +146,17 @@ export function ArbitrageBar({ mercariPriceJpy, usdRate, listings }: ArbitrageBa
         </span>
         <div className="ml-auto flex gap-4">
           <div className="text-center">
-            <p className="text-xs text-emerald-400">Free ship profit</p>
+            <p className={`text-xs ${profitable ? 'text-emerald-400' : 'text-red-300'}`}>Free ship profit</p>
             <p className={`text-sm font-bold ${profitColor(fees.profitFreeShip)}`}>{fmt(fees.profitFreeShip)}</p>
           </div>
           <div className="text-center">
-            <p className="text-xs text-emerald-400">Buyer pays profit</p>
+            <p className={`text-xs ${profitable ? 'text-emerald-400' : 'text-red-300'}`}>Buyer pays profit</p>
             <p className={`text-sm font-bold ${profitColor(fees.profitBuyerShip)}`}>{fmt(fees.profitBuyerShip)}</p>
           </div>
         </div>
       </div>
 
-      <p className="text-xs text-zinc-700 border-t border-emerald-900 pt-3 mt-3">
+      <p className={`text-xs text-zinc-700 border-t pt-3 mt-3 ${profitable ? 'border-emerald-900' : 'border-red-900'}`}>
         eBay fee defaults: {feeInputs.ebayFvfPct}% final value + ${feeInputs.ebayPerOrderFee.toFixed(2)}/order. Buyee: ¥{feeInputs.buyeeServiceFeeJpy} service + ¥{feeInputs.buyeeDomesticShipJpy} domestic. Exchange rate: ¥1 = ${usdRate.toFixed(5)}. All estimates — actual costs vary.
       </p>
     </div>

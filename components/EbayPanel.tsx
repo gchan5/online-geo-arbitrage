@@ -8,9 +8,10 @@ interface EbayPanelProps {
   searchQuery: string
   loading: boolean
   onReSearch: (query: string) => void
+  onRemoveListing: (listing: EbayListing) => void
 }
 
-export function EbayPanel({ listings, searchQuery, loading, onReSearch }: EbayPanelProps) {
+export function EbayPanel({ listings, searchQuery, loading, onReSearch, onRemoveListing }: EbayPanelProps) {
   if (loading && !listings) {
     return (
       <div className="flex-1 bg-zinc-900 border border-zinc-800 rounded-xl p-4">
@@ -59,7 +60,7 @@ export function EbayPanel({ listings, searchQuery, loading, onReSearch }: EbayPa
 
       {listings.length === 0 ? (
         <div className="text-center py-8 text-zinc-500">
-          <p className="text-sm mb-2">No sold listings found.</p>
+          <p className="text-sm mb-2">No active listings to analyze.</p>
           <button onClick={handleEditSearch} className="text-xs text-blue-400 hover:underline">
             Try a different search term
           </button>
@@ -67,45 +68,59 @@ export function EbayPanel({ listings, searchQuery, loading, onReSearch }: EbayPa
       ) : (
         <div className="space-y-2">
           {listings.map((listing, i) => (
-            <a
+            <div
               key={i}
-              href={listing.url}
-              target="_blank"
-              rel="noopener noreferrer"
               className="
                 flex items-center gap-3 bg-zinc-800 hover:bg-zinc-700
                 border border-transparent hover:border-zinc-600
-                rounded-lg p-2.5 transition-colors no-underline
+                rounded-lg p-2.5 transition-colors
               "
             >
-              <div className="relative w-12 h-12 flex-shrink-0 bg-zinc-700 rounded-lg overflow-hidden">
-                {listing.thumbnail ? (
-                  <Image
-                    src={listing.thumbnail}
-                    alt={listing.title}
-                    fill
-                    className="object-cover"
-                    unoptimized
-                  />
-                ) : (
-                  <div className="flex items-center justify-center h-full text-xl">🃏</div>
-                )}
-              </div>
+              <a
+                href={listing.url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center gap-3 min-w-0 flex-1 no-underline"
+              >
+                <div className="relative w-12 h-12 flex-shrink-0 bg-zinc-700 rounded-lg overflow-hidden">
+                  {listing.thumbnail ? (
+                    <Image
+                      src={listing.thumbnail}
+                      alt={listing.title}
+                      fill
+                      className="object-cover"
+                      unoptimized
+                    />
+                  ) : (
+                    <div className="flex items-center justify-center h-full text-xl">🃏</div>
+                  )}
+                </div>
 
-              <div className="flex-1 min-w-0">
-                <p className="text-xs text-zinc-300 truncate">{listing.title}</p>
-                <p className="text-xs text-zinc-500 mt-0.5">
-                  {formatDate(listing.sold_date)}{listing.condition ? ` · ${listing.condition}` : ''}
-                </p>
-              </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-xs text-zinc-300 truncate">{listing.title}</p>
+                  <p className="text-xs text-zinc-500 mt-0.5">
+                    {formatDate(listing.sold_date)}{listing.condition ? ` · ${listing.condition}` : ''}
+                  </p>
+                </div>
 
-              <div className="text-right flex-shrink-0">
-                <p className="text-sm font-bold text-green-400">
-                  ${listing.price_usd.toFixed(2)}
-                </p>
-                <p className="text-xs text-zinc-600">↗</p>
-              </div>
-            </a>
+                <div className="text-right flex-shrink-0">
+                  <p className="text-sm font-bold text-green-400">
+                    ${listing.price_usd.toFixed(2)}
+                  </p>
+                  <p className="text-xs text-zinc-600">↗</p>
+                </div>
+              </a>
+
+              <button
+                type="button"
+                onClick={() => onRemoveListing(listing)}
+                className="flex-shrink-0 w-6 h-6 rounded border border-zinc-700 text-zinc-400 hover:text-red-300 hover:border-red-400 transition-colors text-xs font-semibold"
+                aria-label={`Remove listing ${listing.title}`}
+                title="Remove from analysis"
+              >
+                ×
+              </button>
+            </div>
           ))}
         </div>
       )}

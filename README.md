@@ -8,7 +8,7 @@ Paste a Mercari JP listing URL and instantly see matching eBay sold listings alo
 
 - **Mercari JP scraping** — pulls listing image, title, price, condition, and seller rating directly from the page
 - **Auto-translation** — translates the Japanese item name to English via Google Translate (editable before search)
-- **eBay sold listings** — searches eBay's Finding API for completed sales matching the translated title, with thumbnails and direct links
+- **eBay sold listings** — searches eBay's Browse API using OAuth app tokens, with thumbnails and direct links
 - **Arbitrage dashboard** — calculates net profit after all fees:
   - Buyee proxy service fee (¥300) + Japan domestic shipping (¥500)
   - International shipping (editable, default $10)
@@ -23,7 +23,7 @@ Paste a Mercari JP listing URL and instantly see matching eBay sold listings alo
 
 - [Next.js](https://nextjs.org/) (App Router) + TypeScript
 - Tailwind CSS (dark mode)
-- [eBay Finding API](https://developer.ebay.com/Devzone/finding/Concepts/FindingAPIGuide.html) — sold listings
+- [eBay Buy Browse API](https://developer.ebay.com/api-docs/buy/browse/overview.html) — listing search
 - [Google Cloud Translation API v2](https://cloud.google.com/translate/docs/reference/rest) — JP → EN
 - [Frankfurter](https://www.frankfurter.app/) — live JPY → USD exchange rate
 - [Buyee](https://buyee.jp/) fee model for Japan proxy purchasing
@@ -49,12 +49,14 @@ cp .env.local.example .env.local
 
 ```
 GOOGLE_TRANSLATE_API_KEY=   # Google Cloud Translation API key
-EBAY_APP_ID=                # eBay Developer App ID (Client ID)
+EBAY_CLIENT_ID=             # eBay OAuth Client ID
+EBAY_CLIENT_SECRET=         # eBay OAuth Client Secret
+EBAY_MARKETPLACE_ID=EBAY_US # Optional, defaults to EBAY_US
 ```
 
 **Getting API keys:**
 
-- **eBay App ID:** [developer.ebay.com](https://developer.ebay.com) → My Account → Application Keys → create a Production app → copy the App ID (Client ID)
+- **eBay OAuth credentials:** [developer.ebay.com](https://developer.ebay.com) → My Account → Application Keys → create a Production app → copy Client ID and Client Secret
 - **Google Translate key:** [console.cloud.google.com](https://console.cloud.google.com) → enable Cloud Translation API → Credentials → Create API Key
 
 ### 3. Run locally
@@ -69,7 +71,7 @@ Open [http://localhost:3000](http://localhost:3000), paste a Mercari JP listing 
 
 1. Push to GitHub
 2. Import the repo at [vercel.com](https://vercel.com) → New Project
-3. Add `GOOGLE_TRANSLATE_API_KEY` and `EBAY_APP_ID` as environment variables
+3. Add `GOOGLE_TRANSLATE_API_KEY`, `EBAY_CLIENT_ID`, and `EBAY_CLIENT_SECRET` as environment variables
 4. Deploy — the `vercel.json` already sets a 30s timeout on the analyze route
 
 ## How It Works
@@ -84,7 +86,7 @@ POST /api/analyze  (streaming NDJSON)
   Google Translate → English title
   Frankfurter      → JPY/USD rate
         ↓ chunk 3
-  eBay Finding API → sold listings
+  eBay Browse API + OAuth app token → listings
         ↓
   Client computes arbitrage stats from sold prices + fees
 ```
