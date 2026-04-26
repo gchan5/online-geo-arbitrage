@@ -36,7 +36,14 @@ export async function POST(request: Request) {
 
         // Step 3: eBay sold listings
         currentStep = 'ebay'
+        console.info('[api/analyze] searching ebay from translated title', {
+          title_en: translateResult.text,
+        })
         const listings = await findSoldListings(translateResult.text)
+        console.info('[api/analyze] ebay search complete', {
+          title_en: translateResult.text,
+          total_results: listings.length,
+        })
         controller.enqueue(send({
           type: 'ebay',
           data: { listings, total_results: listings.length },

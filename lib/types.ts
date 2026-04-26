@@ -15,7 +15,7 @@ export interface MercariError {
   step: 'mercari'
 }
 
-// eBay sold listing from Finding API
+// eBay listing normalized from Browse API
 export interface EbayListing {
   title: string
   price_usd: number

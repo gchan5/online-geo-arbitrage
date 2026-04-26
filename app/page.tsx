@@ -16,6 +16,11 @@ export default function Home() {
   const [titleEn, setTitleEn] = useState('')
   const [usdRate, setUsdRate] = useState<number | null>(null)
   const [listings, setListings] = useState<EbayListing[] | null>(null)
+  const [removedListingKeys, setRemovedListingKeys] = useState<Set<string>>(new Set())
+
+  function listingKey(listing: EbayListing): string {
+    return [listing.url, listing.title, listing.sold_date, listing.price_usd].join('|')
+  }
 
   async function handleSubmit(url: string) {
     setStatus('loading')
@@ -24,6 +29,7 @@ export default function Home() {
     setTitleEn('')
     setUsdRate(null)
     setListings(null)
+    setRemovedListingKeys(new Set())
 
     try {
       const res = await fetch('/api/analyze', {
@@ -49,6 +55,7 @@ export default function Home() {
           setUsdRate(chunk.data.usd_rate)
         } else if (chunk.type === 'ebay') {
           setListings(chunk.data.listings)
+          setRemovedListingKeys(new Set())
           setStatus('done')
         } else if (chunk.type === 'error') {
           setError(chunk.message)
@@ -77,6 +84,7 @@ export default function Home() {
   async function handleReSearch(query: string) {
     setTitleEn(query)
     setListings(null)
+    setRemovedListingKeys(new Set())
     setStatus('loading')
 
     try {
@@ -87,6 +95,7 @@ export default function Home() {
       })
       const data = await res.json() as { listings: EbayListing[] }
       setListings(data.listings)
+      setRemovedListingKeys(new Set())
       setStatus('done')
     } catch {
       setListings([])
@@ -95,6 +104,17 @@ export default function Home() {
   }
 
   const loading = status === 'loading'
+  const visibleListings = listings
+    ? listings.filter((listing) => !removedListingKeys.has(listingKey(listing)))
+    : null
+
+  function handleRemoveListing(listing: EbayListing) {
+    setRemovedListingKeys((prev) => {
+      const next = new Set(prev)
+      next.add(listingKey(listing))
+      return next
+    })
+  }
 
   return (
     <main className="max-w-6xl mx-auto px-4 py-8">
@@ -112,6 +132,16 @@ export default function Home() {
 
       {(loading || mercari) && (
         <>
+          {mercari && usdRate && visibleListings && visibleListings.length > 0 && (
+            <div className="mb-4">
+              <ArbitrageBar
+                mercariPriceJpy={mercari.price_jpy}
+                usdRate={usdRate}
+                listings={visibleListings}
+              />
+            </div>
+          )}
+
           <div className="flex gap-4 mb-4">
             <MercariPanel
               listing={mercari}
@@ -121,20 +151,13 @@ export default function Home() {
               onEditTitle={handleReSearch}
             />
             <EbayPanel
-              listings={listings}
+              listings={visibleListings}
               searchQuery={titleEn}
               loading={loading}
               onReSearch={handleReSearch}
+              onRemoveListing={handleRemoveListing}
             />
           </div>
-
-          {mercari && usdRate && listings && listings.length > 0 && (
-            <ArbitrageBar
-              mercariPriceJpy={mercari.price_jpy}
-              usdRate={usdRate}
-              listings={listings}
-            />
-          )}
         </>
       )}
     </main>
