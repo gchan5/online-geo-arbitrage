@@ -28,6 +28,22 @@ function isValidMercariUrl(url: string): boolean {
   }
 }
 
+function isValidBuyeeAuctionUrl(url: string): boolean {
+  try {
+    const parsed = new URL(url)
+    return (
+      parsed.hostname === 'buyee.jp' &&
+      /^\/item\/jdirectitems\/auction\/[a-z]\d+$/i.test(parsed.pathname)
+    )
+  } catch {
+    return false
+  }
+}
+
+function isSupportedListingUrl(url: string): boolean {
+  return isValidMercariUrl(url) || isValidBuyeeAuctionUrl(url)
+}
+
 interface MercariItem {
   id?: string
   name: string
@@ -48,6 +64,18 @@ function getMetaContent($: cheerio.CheerioAPI, key: string): string {
 
 function stripMercariTitleSuffix(title: string): string {
   return title.replace(/\s*by メルカリ$/, '').trim()
+}
+
+function stripBuyeeTitleSuffix(title: string): string {
+  return title
+    .replace(/\s*\/\s*【Buyee】.*$/i, '')
+    .replace(/\s*-\s*Japanese Proxy Service.*$/i, '')
+    .trim()
+}
+
+function parseYenAmount(raw: string): number {
+  const digits = raw.replace(/[^\d]/g, '')
+  return Number.parseInt(digits, 10)
 }
 
 function extractListingFromMeta(
@@ -75,6 +103,43 @@ function extractListingFromMeta(
   }
 }
 
+function extractBuyeeListingFromPage(
+  $: cheerio.CheerioAPI,
+  url: string
+): MercariListing | null {
+  const rawTitle = getMetaContent($, 'og:title') || $('title').text().trim()
+  const title = stripBuyeeTitleSuffix(rawTitle)
+  if (!title) return null
+
+  const image = getMetaContent($, 'og:image')
+  const text = $('body').text().replace(/\s+/g, ' ')
+  const currentPriceMatch =
+    text.match(/Current Price\s*([\d,]+)\s*YEN/i) ||
+    text.match(/Starting Price\s*([\d,]+)\s*YEN/i)
+  const buyoutMatch = text.match(/Buyout Price\s*([\d,]+)\s*YEN/i)
+
+  const price_jpy = currentPriceMatch
+    ? parseYenAmount(currentPriceMatch[1])
+    : (buyoutMatch ? parseYenAmount(buyoutMatch[1]) : Number.NaN)
+  if (Number.isNaN(price_jpy)) return null
+
+  const conditionMatch = text.match(/Item Condition\s*([^0-9]+?)(?:Starting Price|Current Price|Item Quantity)/i)
+  const condition = conditionMatch?.[1]?.trim() ?? ''
+  const ratingMatch = text.match(/Percentage of good ratings\s*([\d.]+%?)/i)
+  const shippingMatch = text.match(/Domestic Shipping Fee Responsibility\s*(Winner|Seller)/i)
+
+  return {
+    title_jp: title,
+    images: image ? [image] : [],
+    price_jpy,
+    condition,
+    condition_en: condition,
+    seller_rating: ratingMatch?.[1] ?? 'N/A',
+    shipping_included: (shippingMatch?.[1]?.toLowerCase() ?? '') === 'seller',
+    url,
+  }
+}
+
 function extractItem(data: unknown): MercariItem | null {
   // Try known __NEXT_DATA__ paths — defensive in case Mercari updates their structure
   const candidates = [
@@ -95,8 +160,11 @@ function extractItem(data: unknown): MercariItem | null {
 export async function fetchMercariListing(
   url: string
 ): Promise<MercariListing | MercariError> {
-  if (!isValidMercariUrl(url)) {
-    return { error: 'Invalid Mercari JP URL. Must start with https://jp.mercari.com/item/', step: 'mercari' }
+  if (!isSupportedListingUrl(url)) {
+    return {
+      error: 'Invalid URL. Use a Mercari JP item URL or a Buyee JDirectItems auction URL.',
+      step: 'mercari',
+    }
   }
 
   let html: string
@@ -110,16 +178,24 @@ export async function fetchMercariListing(
     })
     if (!res.ok) {
       return {
-        error: `Mercari JP returned ${res.status}. The listing may be blocked or unavailable. Try again.`,
+        error: `Listing page returned ${res.status}. The listing may be blocked or unavailable. Try again.`,
         step: 'mercari',
       }
     }
     html = await res.text()
   } catch (err) {
-    return { error: 'Could not reach Mercari JP. Check your connection.', step: 'mercari' }
+    return { error: 'Could not reach listing page. Check your connection.', step: 'mercari' }
   }
 
   const $ = cheerio.load(html)
+  if (isValidBuyeeAuctionUrl(url)) {
+    const buyeeListing = extractBuyeeListingFromPage($, url)
+    if (buyeeListing) {
+      return buyeeListing
+    }
+    return { error: 'Could not parse listing data — Buyee page structure may have changed.', step: 'mercari' }
+  }
+
   const nextDataText = $('#__NEXT_DATA__').text()
   if (!nextDataText) {
     const listingFromMeta = extractListingFromMeta($, url)

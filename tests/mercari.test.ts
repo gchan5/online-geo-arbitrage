@@ -34,6 +34,29 @@ function makeMetaHtml({
   </head><body></body></html>`
 }
 
+function makeBuyeeHtml({
+  title = 'わるいゲンガー LV.32 ★ [旧裏面] /【Buyee】 Buyee - Japanese Proxy Service',
+  image = 'https://buyee.jp/images/sample.jpg',
+  currentPrice = '31,819',
+  condition = 'Damaged/dirty',
+  shipping = 'Winner',
+}: {
+  title?: string
+  image?: string
+  currentPrice?: string
+  condition?: string
+  shipping?: 'Winner' | 'Seller'
+}) {
+  return `<html><head>
+    <meta property="og:title" content="${title}" />
+    <meta property="og:image" content="${image}" />
+  </head><body>
+    <div>Item Condition ${condition}</div>
+    <div>Current Price ${currentPrice} YEN</div>
+    <div>Domestic Shipping Fee Responsibility ${shipping}</div>
+  </body></html>`
+}
+
 describe('mapConditionToEnglish', () => {
   it('maps known JP condition strings to English', () => {
     expect(mapConditionToEnglish('新品、未使用')).toBe('New, unused')
@@ -54,7 +77,7 @@ describe('fetchMercariListing', () => {
     const result = await fetchMercariListing('https://example.com/item/m123')
     expect('error' in result).toBe(true)
     if ('error' in result) {
-      expect(result.error).toMatch(/invalid/i)
+      expect(result.error).toMatch(/mercari|buyee|invalid/i)
     }
   })
 
@@ -81,6 +104,23 @@ describe('fetchMercariListing', () => {
       expect(result.condition_en).toBe('No notable scratches or stains')
       expect(result.images).toContain('https://static.mercdn.net/img1.jpg')
       expect(result.shipping_included).toBe(true)
+    }
+  })
+
+  it('returns listing for valid Buyee JDirectItems auction page', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
+      ok: true,
+      text: async () => makeBuyeeHtml({}),
+    }))
+
+    const result = await fetchMercariListing('https://buyee.jp/item/jdirectitems/auction/b1225803330')
+    expect('error' in result).toBe(false)
+    if (!('error' in result)) {
+      expect(result.title_jp).toBe('わるいゲンガー LV.32 ★ [旧裏面]')
+      expect(result.price_jpy).toBe(31819)
+      expect(result.condition).toBe('Damaged/dirty')
+      expect(result.shipping_included).toBe(false)
+      expect(result.images[0]).toContain('buyee.jp/images/sample.jpg')
     }
   })
 
