@@ -18,7 +18,7 @@ export function UrlInput({ onSubmit, loading }: UrlInputProps) {
       <input
         name="url"
         type="url"
-        placeholder="https://jp.mercari.com/item/m12345678"
+        placeholder="https://jp.mercari.com/item/m12345678 or https://buyee.jp/item/jdirectitems/auction/b1234567890"
         required
         className="
           flex-1 bg-zinc-900 border border-zinc-700 rounded-lg
